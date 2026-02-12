@@ -301,6 +301,8 @@ fold-at-home fold SOD1 A4V --skip-fold
 
 This runs everything except the fold: pLDDT analysis, RMSD vs wild-type, ClinVar + gnomAD lookup, PubMed papers, and AI summary. You get the same `summary.md` and `metadata.json` as a full run.
 
+**Want to contribute GPU power to protein research?** Join the Clarity Protocol team on [Folding@Home](https://foldingathome.org/) — **Team ID: 1067834**. Folding@Home runs protein folding simulations on your computer when it's idle, contributing to real medical research. Any OS, any hardware.
+
 ## Output
 
 Each fold produces a results directory. By default, results go to `./results/` relative to where you ran the command. You can change this in your config (`results_dir`) or with `--output`.

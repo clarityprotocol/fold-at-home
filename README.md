@@ -1,6 +1,18 @@
 # fold-at-home
 
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![Platform: Linux | WSL2 | macOS](https://img.shields.io/badge/platform-Linux%20%7C%20WSL2%20%7C%20macOS-lightgrey)
+
 Predict protein structures and generate AI-powered research summaries — locally, on your own hardware.
+
+## Quick start
+
+```bash
+pip install "fold-at-home[anthropic]"
+fold-at-home init                      # creates config — add your API key
+fold-at-home fold SOD1 A4V             # fold, analyze, summarize
+```
+
+Results land in `results/SOD1_A4V/summary.md`. See [full setup](#prerequisites) below.
 
 ## What it does
 

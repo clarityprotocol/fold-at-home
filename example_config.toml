@@ -1,0 +1,35 @@
+# fold-at-home configuration
+# Copy to ~/.fold-at-home/config.toml and edit
+
+[folding]
+backend = "colabfold"                    # "colabfold" or "alphafold"
+colabfold_path = "colabfold_batch"       # Path to binary (or just name if in PATH)
+alphafold_path = ""                      # Path to alphafold binary or docker image
+gpu_device = ""                          # GPU device ID (empty = auto-detect)
+timeout_hours = 4.0                      # Max fold time before killing
+num_models = 5                           # Number of models to generate
+memory_watchdog = true                   # Kill fold if system memory runs low
+
+[ai]
+provider = "anthropic"                   # "anthropic", "openai", or "ollama"
+model = ""                               # Empty = provider default (claude-sonnet-4-5, gpt-4o, etc.)
+
+# Set ONE of these (or use environment variables ANTHROPIC_API_KEY / OPENAI_API_KEY):
+anthropic_api_key = ""
+openai_api_key = ""
+
+# Ollama settings (for local AI — no API key needed):
+ollama_url = "http://localhost:11434"
+ollama_model = "llama3.1:70b"
+
+[pubmed]
+email = "user@example.com"               # Required by NCBI Entrez
+ncbi_api_key = ""                        # Optional: enables 10 requests/sec instead of 3
+max_papers = 20                          # Max papers to fetch per fold
+
+[output]
+results_dir = "./results"                # Default output directory
+
+[watch]
+poll_interval = 60                       # Seconds between queue checks
+archive_processed = true                 # Move processed .fasta to archive/ subfolder

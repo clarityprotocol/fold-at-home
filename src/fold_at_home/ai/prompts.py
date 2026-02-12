@@ -1,6 +1,8 @@
 """Prompt templates for AI summarization.
 
 Generalized for any protein/disease — not specific to Alzheimer's.
+Includes clinical context integration, significance interpretation,
+and hypothesis generation.
 """
 
 from typing import Optional
@@ -12,8 +14,14 @@ Your task is to generate:
 1. A TLDR summary (2-3 sentences) that anyone can understand
 2. A detailed summary with inline citations [1], [2] when papers are available
 
-Be precise and scientifically accurate while explaining concepts in accessible language.
-Define technical terms inline when first used."""
+Guidelines:
+- Be precise and scientifically accurate while explaining concepts in accessible language.
+- Define technical terms inline when first used.
+- When clinical data is provided (ClinVar, gnomAD), integrate pathogenicity and population frequency into your analysis.
+- Note whether the variant is classified as pathogenic by expert panels.
+- Discuss what population frequency (or absence from gnomAD) tells us about the variant.
+- End with a forward-looking hypothesis about structural implications or therapeutic relevance.
+- Be honest about uncertainty — distinguish predictions from experimental findings."""
 
 
 def build_summary_prompt(
@@ -25,6 +33,7 @@ def build_summary_prompt(
     confidence: Optional[dict],
     rmsd: Optional[dict],
     papers: Optional[list],
+    clinical_data: Optional[dict] = None,
 ) -> tuple[str, str]:
     """Build prompt and system prompt for AI summary generation.
 
@@ -37,6 +46,7 @@ def build_summary_prompt(
         confidence: pLDDT analysis result dict
         rmsd: RMSD comparison result dict
         papers: List of paper dicts from PubMed
+        clinical_data: ClinVar + gnomAD data from enrichment
 
     Returns:
         (prompt, system_prompt) tuple
@@ -54,6 +64,15 @@ def build_summary_prompt(
     if rationale:
         parts.append(f"- Rationale: {rationale}")
     parts.append("")
+
+    # Clinical variant data (ClinVar + gnomAD)
+    if clinical_data:
+        from ..discovery.enrichment import format_clinical_context
+
+        clinical_text = format_clinical_context(clinical_data)
+        if clinical_text:
+            parts.append(clinical_text)
+            parts.append("")
 
     # Confidence analysis
     if confidence:
@@ -80,6 +99,8 @@ def build_summary_prompt(
         parts.append(f"- RMSD after alignment: {rmsd.get('rmsd_after_alignment', 0):.2f} A")
         parts.append(f"- Atoms aligned: {rmsd.get('num_atoms_aligned', 0)}")
         parts.append(f"- Source: AlphaFold DB ({rmsd.get('wild_type_uniprot', '')})")
+        parts.append("")
+        parts.append(_rmsd_interpretation_guide())
         parts.append("")
 
     # Literature context
@@ -117,6 +138,27 @@ def build_summary_prompt(
     parts.append("")
     parts.append("**Tone:** Educated general audience")
     parts.append("**Style:** Honest about uncertainty, scientifically cautious")
-    parts.append("**Formatting:** 3-5 paragraphs covering distinct aspects")
+    parts.append("")
+    parts.append("**Detailed summary structure (3-5 paragraphs):**")
+    parts.append("1. **Context:** What the protein does and why this variant matters")
+    parts.append("2. **Structural findings:** Confidence scores, destabilized regions, RMSD interpretation")
+
+    if clinical_data:
+        parts.append("3. **Clinical significance:** Integrate ClinVar classification and population frequency")
+        parts.append("4. **Literature context:** What published research shows about this variant")
+        parts.append("5. **Implications:** Forward-looking hypothesis about structural/therapeutic implications")
+    else:
+        parts.append("3. **Literature context:** What published research shows about this variant")
+        parts.append("4. **Implications:** Forward-looking hypothesis about structural/therapeutic implications")
 
     return "\n".join(parts), SYSTEM_PROMPT
+
+
+def _rmsd_interpretation_guide() -> str:
+    """Provide RMSD interpretation reference for the AI."""
+    return """RMSD Interpretation Guide:
+  - < 0.5 A: Nearly identical to wild-type (minimal structural effect)
+  - 0.5-1.0 A: Minor conformational changes (subtle effect)
+  - 1.0-2.0 A: Moderate structural deviation (significant local changes)
+  - 2.0-3.0 A: Substantial rearrangement (major structural impact)
+  - > 3.0 A: Large-scale conformational change (severe disruption)"""

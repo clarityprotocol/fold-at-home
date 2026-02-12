@@ -11,5 +11,6 @@ venv/
 .env
 .pytest_cache/
 results/
+test_run/
 *.pdb
 *.fasta

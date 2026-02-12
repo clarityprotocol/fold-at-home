@@ -217,6 +217,41 @@ def run_pipeline(
             except Exception as e:
                 console.print(f"  Papers: [yellow]Search failed ({e})[/yellow]")
 
+    # === Step 6b: Clinical enrichment (ClinVar + gnomAD) ===
+    clinical_data = None
+    gene_symbol = None
+
+    if variant and uniprot_info and uniprot_info.get("found"):
+        gene_symbol = uniprot_info.get("gene_symbol")
+
+    if variant and gene_symbol:
+        with console.status("[bold]Looking up clinical data (ClinVar + gnomAD)..."):
+            try:
+                from .discovery.enrichment import enrich_variant
+                clinical_data = enrich_variant(
+                    gene_symbol=gene_symbol,
+                    variant_notation=variant,
+                    email=config.pubmed.email,
+                    ncbi_api_key=config.pubmed.ncbi_api_key or None,
+                )
+                if clinical_data:
+                    sig = clinical_data.get("clinvar_significance")
+                    af = clinical_data.get("gnomad_af")
+                    if sig:
+                        console.print(f"  ClinVar: [green]{sig}[/green]")
+                    else:
+                        console.print(f"  ClinVar: [dim]No entry found[/dim]")
+                    if af is not None:
+                        console.print(f"  gnomAD:  [green]AF={af:.2e}[/green]")
+                    else:
+                        console.print(f"  gnomAD:  [dim]Not in population database[/dim]")
+
+                    metadata["clinical"] = clinical_data
+                else:
+                    console.print(f"  Clinical: [dim]No data available[/dim]")
+            except Exception as e:
+                console.print(f"  Clinical: [yellow]Lookup failed ({e})[/yellow]")
+
     # === Step 7: AI summary ===
     summary_text = None
 
@@ -242,6 +277,7 @@ def run_pipeline(
                         confidence=confidence_result,
                         rmsd=rmsd_result,
                         papers=papers,
+                        clinical_data=clinical_data,
                     )
 
                     result = provider.generate_summary(prompt, system_prompt)

@@ -11,66 +11,237 @@ Predict protein structures and generate AI-powered research summaries — locall
 5. **Generates a citation-backed summary** using Claude, GPT-4, or a local Ollama model
 6. **Writes everything** to a clean results folder
 
-## Install
+## Prerequisites
+
+Before installing fold-at-home, you need a folding backend and a GPU.
+
+### 1. Check your GPU
+
+ColabFold and AlphaFold require an NVIDIA GPU with CUDA support.
+
+```bash
+# Verify NVIDIA drivers are installed
+nvidia-smi
+
+# You should see your GPU name, driver version, and CUDA version
+# If this fails, install NVIDIA drivers first: https://www.nvidia.com/drivers
+```
+
+### 2. Install a folding backend
+
+You need **one** of these. ColabFold is recommended — it's faster to install and run.
+
+**Option A: ColabFold (recommended)**
+
+ColabFold is a fast, optimized version of AlphaFold that uses MMseqs2 for sequence search.
+
+```bash
+# Install via conda (takes ~20 minutes)
+# Full guide: https://github.com/sokrypton/ColabFold
+
+# 1. Install Miniconda if you don't have it
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+
+# 2. Create ColabFold environment
+conda create -n colabfold python=3.10 -y
+conda activate colabfold
+
+# 3. Install ColabFold
+pip install colabfold[alphafold]
+
+# 4. Verify it works
+colabfold_batch --help
+```
+
+> **Disk space:** ColabFold downloads sequence databases on first run (~100 GB). Make sure you have space.
+
+**Option B: AlphaFold**
+
+Original DeepMind implementation. Slower but supports more features.
+
+```bash
+# Install via Docker (easiest)
+# Full guide: https://github.com/google-deepmind/alphafold
+
+docker pull alphafold
+```
+
+> **Disk space:** AlphaFold databases require ~2.5 TB. Consider ColabFold if space is limited.
+
+### 3. Verify your backend is working
+
+```bash
+# ColabFold — should print help text
+colabfold_batch --help
+
+# AlphaFold Docker — should show the image
+docker images | grep alphafold
+```
+
+### 4. Python 3.10+
+
+```bash
+python --version  # Should be 3.10 or higher
+```
+
+## Install fold-at-home
 
 ```bash
 pip install fold-at-home
 
-# With AI provider support:
+# With AI provider support (pick one or both):
 pip install "fold-at-home[anthropic]"   # Claude
 pip install "fold-at-home[openai]"      # GPT-4
 pip install "fold-at-home[all]"         # Both
+
+# Ollama (local AI) needs no extra package — just install Ollama separately
+# https://ollama.com
 ```
 
-### Prerequisites
+## Setup
 
-- **ColabFold** or **AlphaFold** installed locally
-  - [ColabFold install guide](https://github.com/sokrypton/ColabFold)
-  - [AlphaFold install guide](https://github.com/google-deepmind/alphafold)
-- **Python 3.10+**
-- **GPU recommended** (ColabFold/AlphaFold are compute-intensive)
-
-## Quick start
+### 1. Create config file
 
 ```bash
-# Create config file
 fold-at-home init
-
-# Edit config with your API keys
-nano ~/.fold-at-home/config.toml
-
-# Check setup
-fold-at-home status
-
-# Fold a protein variant
-fold-at-home fold SOD1 A4V
-
-# Fold with a rationale
-fold-at-home fold SOD1 A4V --rationale "ALS-linked variant"
-
-# Use your own FASTA file
-fold-at-home fold --fasta ~/my_protein.fasta --protein SOD1 --variant A4V
 ```
 
-## Watch mode
+This creates `~/.fold-at-home/config.toml` with default settings.
+
+### 2. Edit your config
+
+```bash
+nano ~/.fold-at-home/config.toml
+```
+
+At minimum, set these:
+
+```toml
+[ai]
+provider = "anthropic"                      # or "openai" or "ollama"
+anthropic_api_key = "sk-ant-your-key-here"  # from console.anthropic.com
+
+[pubmed]
+email = "your-real@email.com"               # Required by NCBI (they may contact you about API usage)
+```
+
+### 3. Verify everything
+
+```bash
+fold-at-home status
+```
+
+You should see something like:
+
+```
+                        fold-at-home status
+┌─────────────────┬──────────────────────────────────────┐
+│ Version         │ 0.1.0                                │
+│ Config          │ Found                                │
+│                 │                                      │
+│ Folding backend │ colabfold                            │
+│ Backend binary  │ Found at /usr/local/bin/colabfold... │
+│ GPU device      │ auto                                 │
+│                 │                                      │
+│ AI provider     │ anthropic                            │
+│ AI key/endpoint │ sk-ant-a...xY2z                      │
+│ AI model        │ (provider default)                   │
+│                 │                                      │
+│ PubMed email    │ your-real@email.com                  │
+│ Results dir     │ ./results                            │
+└─────────────────┴──────────────────────────────────────┘
+```
+
+**What to check:**
+- **Backend binary** should say "Found at ..." (green). If it says "Not found", ColabFold/AlphaFold isn't in your PATH — set `colabfold_path` in config to the full path.
+- **AI key/endpoint** should show a masked key. If it says "No API key", add your key to the config or set `ANTHROPIC_API_KEY` as an environment variable.
+
+## Usage
+
+### Single fold
+
+```bash
+# Basic: protein name + variant
+fold-at-home fold SOD1 A4V
+
+# With a rationale (included in the summary)
+fold-at-home fold SOD1 A4V --rationale "ALS-linked variant"
+
+# Using your own FASTA file
+fold-at-home fold --fasta ~/my_protein.fasta --protein SOD1 --variant A4V
+
+# Wild-type (no variant)
+fold-at-home fold SOD1
+```
+
+**What happens when you run this:**
+
+```
+╭──────── fold-at-home ────────╮
+│ SOD1 A4V                     │
+│ ALS-linked variant           │
+╰──────────────────────────────╯
+  UniProt: SOD1 (Superoxide dismutase [Cu-Zn])
+  FASTA: Downloaded
+
+Running structure prediction...
+  [ColabFold] Running model 1/5...
+  [ColabFold] Running model 2/5...
+  ...
+  Folding complete (847s)
+
+  pLDDT: 82.4 average confidence
+  RMSD:  1.87 A vs wild-type
+  Papers: 14 found
+  Summary: Generated
+
+╭──────── Complete ────────╮
+│ Results: results/SOD1_A4V│
+│   summary.md             │
+│   metadata.json          │
+│   structure/             │
+│   analysis/              │
+╰──────────────────────────╯
+```
+
+### Watch mode
 
 Drop `.fasta` files into a folder and fold-at-home processes them automatically:
 
 ```bash
 fold-at-home watch ~/my_folds/
 
-# Custom poll interval
+# Custom poll interval (check every 30 seconds)
 fold-at-home watch ~/my_folds/ --interval 30
 ```
 
-### FASTA naming convention
-
-The filename tells fold-at-home what it's folding:
+**FASTA naming convention** — the filename tells fold-at-home what to fold:
 
 ```
-SOD1_A4V.fasta         → protein=SOD1, variant=A4V
-01_tau_P301L.fasta     → protein=tau, variant=P301L (number prefix for ordering)
-alpha-synuclein.fasta  → protein=alpha-synuclein, no variant
+SOD1_A4V.fasta         -> protein=SOD1, variant=A4V
+01_tau_P301L.fasta     -> protein=tau, variant=P301L (number prefix for queue order)
+alpha-synuclein.fasta  -> protein=alpha-synuclein, no variant
+```
+
+Processed files are moved to `~/my_folds/archive/` after folding.
+
+### Skip steps
+
+Already folded? No API key? Offline? Run only the parts you need:
+
+```bash
+# Skip folding — just analyze existing PDB + generate summary
+fold-at-home fold SOD1 A4V --skip-fold
+
+# Skip AI summary (no API key needed)
+fold-at-home fold SOD1 A4V --skip-summary
+
+# Skip PubMed search (works offline)
+fold-at-home fold SOD1 A4V --skip-papers
+
+# Combine flags
+fold-at-home fold SOD1 A4V --skip-fold --skip-papers
 ```
 
 ## Output
@@ -79,85 +250,176 @@ Each fold produces a results directory:
 
 ```
 results/SOD1_A4V/
-├── structure/          # PDB files from folding
-├── analysis/           # confidence.json, rmsd.json
-├── visualizations/     # PNG plots (if generated)
-├── papers/             # papers.json (PubMed data)
+├── structure/          # PDB files from folding + wild-type from AlphaFold DB
+├── analysis/
+│   ├── confidence.json # Per-residue pLDDT scores and destabilized regions
+│   └── rmsd.json       # RMSD comparison to wild-type structure
+├── visualizations/     # PNG plots (if your backend generates them)
+├── papers/
+│   └── papers.json     # PubMed search results with abstracts
 ├── summary.md          # Human-readable research summary
-└── metadata.json       # All structured data
+└── metadata.json       # All structured data (protein info, timestamps, results)
 ```
 
-### summary.md format
+### Example summary.md
 
-The summary includes:
-- **TLDR** — 2-3 sentence plain-language summary
-- **Detailed analysis** — structural findings with inline citations [1], [2]
-- **Works Cited** — papers referenced in the summary with PubMed links
-- **Similar Research** — related papers for further reading
+```markdown
+SOD1 (Superoxide dismutase) is a critical enzyme that protects cells from
+oxidative damage. The A4V variant is the most common cause of familial ALS
+(Lou Gehrig's disease) in North America, making its structural characterization
+essential for understanding disease mechanisms.
 
-## Configuration
+---
 
-Config lives at `~/.fold-at-home/config.toml`:
+The predicted structure of SOD1 A4V was generated using ColabFold (AlphaFold2)
+and shows an average pLDDT confidence score of 82.4, indicating high overall
+prediction reliability. The confidence distribution reveals 89 residues (58%)
+in the very high confidence range (pLDDT > 90), with a destabilized region
+spanning residues 37-42 (avg pLDDT: 61.3) near the dimer interface [1].
 
-```toml
-[folding]
-backend = "colabfold"              # "colabfold" or "alphafold"
-colabfold_path = "colabfold_batch" # Path to binary
-gpu_device = ""                    # GPU device (empty = auto)
-num_models = 5                     # Models to predict (3 for large proteins)
-memory_watchdog = true             # Kill fold if memory runs low
+Structural comparison to the wild-type SOD1 (UniProt P00441) reveals an RMSD
+of 1.87 A after alignment across 153 CA atoms, suggesting moderate
+conformational changes introduced by the A4V substitution. The alanine-to-valine
+change at position 4 disrupts hydrophobic packing in the beta-barrel core,
+consistent with experimental findings showing destabilized dimer formation [2].
 
-[ai]
-provider = "anthropic"             # "anthropic", "openai", or "ollama"
-anthropic_api_key = ""             # Or set ANTHROPIC_API_KEY env var
-openai_api_key = ""                # Or set OPENAI_API_KEY env var
-ollama_url = "http://localhost:11434"
-ollama_model = "llama3.1:70b"
+Recent structural studies confirm that A4V promotes SOD1 monomerization,
+a critical step in the aggregation pathway implicated in ALS pathology [3].
+The low-confidence region at residues 37-42 overlaps with the electrostatic
+loop, a region known to undergo conformational changes upon metal loss.
 
-[pubmed]
-email = "your@email.com"           # Required by NCBI
-ncbi_api_key = ""                  # Optional, enables faster searches
-max_papers = 20
+## Works Cited
 
-[output]
-results_dir = "./results"
+[1] Grad et al. (2024). Mutant SOD1 structural dynamics in ALS.
+Journal of Biological Chemistry. [PubMed](https://pubmed.ncbi.nlm.nih.gov/...)
+[DOI](https://doi.org/10.1074/jbc...)
+*Relevance: Demonstrates SOD1 A4V destabilizes dimer interface*
 
-[watch]
-poll_interval = 60                 # Seconds between queue checks
-archive_processed = true           # Move processed FASTA to archive/
+[2] Sheng et al. (2023). Crystal structure of A4V SOD1 variant.
+Nature Structural Biology. [PubMed](https://pubmed.ncbi.nlm.nih.gov/...)
+[DOI](https://doi.org/10.1038/...)
+*Relevance: Experimental RMSD comparison for A4V substitution*
+
+[3] Abel et al. (2024). SOD1 misfolding and aggregation in ALS.
+Neuron. [PubMed](https://pubmed.ncbi.nlm.nih.gov/...)
+[DOI](https://doi.org/10.1016/j.neuron...)
+*Relevance: Links SOD1 monomerization to disease mechanism*
+
+## Similar Research
+
+- Wright et al. (2023). Copper-zinc superoxide dismutase variants...
+  [PubMed](https://pubmed.ncbi.nlm.nih.gov/...)
+- Danielsson et al. (2024). Aggregation propensity of SOD1 mutants...
+  [PubMed](https://pubmed.ncbi.nlm.nih.gov/...)
+
+---
+
+*Generated by [fold-at-home](https://github.com/clarityprotocol/fold-at-home)*
 ```
 
-## Skip steps
+## Configuration reference
 
-Run only the parts you need:
+Config file: `~/.fold-at-home/config.toml`
 
-```bash
-# Already folded? Just analyze and summarize
-fold-at-home fold SOD1 A4V --skip-fold
+### [folding]
 
-# No AI key? Skip the summary
-fold-at-home fold SOD1 A4V --skip-summary
+| Field | Default | Description |
+|-------|---------|-------------|
+| `backend` | `"colabfold"` | Folding backend: `"colabfold"` or `"alphafold"` |
+| `colabfold_path` | `"colabfold_batch"` | Path to ColabFold binary. If it's in your PATH, just the name works. Otherwise use full path like `"/home/user/colabfold/bin/colabfold_batch"` |
+| `alphafold_path` | `""` | Path to AlphaFold binary (only needed if backend is `"alphafold"`) |
+| `gpu_device` | `""` | GPU to use. Empty = auto-detect. Set to `"0"` or `"1"` for multi-GPU systems |
+| `timeout_hours` | `4.0` | Maximum hours per fold before timeout. Most proteins finish in 10-60 min. Increase for very large proteins (>1000 residues) |
+| `num_models` | `5` | Number of models to predict. More = better quality but slower. Automatically reduced to 3 for large proteins |
+| `memory_watchdog` | `true` | Monitor RAM during folds. Kills the fold process if your system runs low on memory (prevents freezes). Recommended on |
 
-# Offline? Skip paper search
-fold-at-home fold SOD1 A4V --skip-papers
-```
+### [ai]
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `provider` | `"anthropic"` | AI provider: `"anthropic"`, `"openai"`, or `"ollama"` |
+| `model` | `""` | Model override. Empty = provider default (Claude Sonnet 4.5 for Anthropic, GPT-4o for OpenAI) |
+| `anthropic_api_key` | `""` | Anthropic API key. Get one at [console.anthropic.com](https://console.anthropic.com). Or set `ANTHROPIC_API_KEY` env var instead |
+| `openai_api_key` | `""` | OpenAI API key. Get one at [platform.openai.com](https://platform.openai.com). Or set `OPENAI_API_KEY` env var instead |
+| `ollama_url` | `"http://localhost:11434"` | Ollama server URL. Only used when provider is `"ollama"` |
+| `ollama_model` | `"llama3.1:70b"` | Ollama model name. Run `ollama list` to see installed models. The 70b model needs ~40 GB VRAM; use `"llama3.1:8b"` for smaller GPUs |
+
+### [pubmed]
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `email` | `"user@example.com"` | Your email address. **Required by NCBI** for PubMed API access. They use it to contact you if your usage causes problems. Use a real email |
+| `ncbi_api_key` | `""` | Optional NCBI API key. Without it: 3 requests/sec. With it: 10 requests/sec. Free at [ncbi.nlm.nih.gov/account](https://www.ncbi.nlm.nih.gov/account/) |
+| `max_papers` | `20` | Maximum papers to fetch per fold. More papers = more context for the AI but slower |
+
+### [output]
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `results_dir` | `"./results"` | Where to write fold results. Each fold gets a subdirectory (e.g., `results/SOD1_A4V/`) |
+
+### [watch]
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `poll_interval` | `60` | How often (seconds) to check the watch folder for new .fasta files |
+| `archive_processed` | `true` | After processing, move .fasta to `archive/` subfolder. Set to `false` to leave files in place (creates `.done` marker instead) |
 
 ## AI providers
 
-| Provider | Model | Needs API key | Notes |
-|----------|-------|---------------|-------|
-| Anthropic | Claude Sonnet 4.5 | Yes | Best quality summaries |
-| OpenAI | GPT-4o | Yes | Good alternative |
-| Ollama | Any local model | No | Free, runs locally, quality varies |
+| Provider | Default Model | API Key Required | Cost | Notes |
+|----------|--------------|-----------------|------|-------|
+| Anthropic | Claude Sonnet 4.5 | Yes | ~$0.01-0.05/summary | Best quality summaries. Recommended |
+| OpenAI | GPT-4o | Yes | ~$0.01-0.05/summary | Good alternative |
+| Ollama | llama3.1:70b | No | Free (runs locally) | Quality varies by model. Needs powerful GPU |
+
+**Env var alternative:** Instead of putting API keys in the config file, you can set environment variables:
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+```
 
 ## Memory safety
 
-fold-at-home includes memory protection for large proteins:
+fold-at-home includes memory protection to prevent system freezes during large folds:
 
-- **Preflight checks** — won't start a fold if RAM is too low
-- **Memory watchdog** — monitors RAM during folds, kills the process before your system freezes
-- **Large protein detection** — automatically reduces models/MSA for proteins >1000 residues
-- **Stale process cleanup** — kills orphaned ColabFold processes
+- **Preflight checks** — verifies at least 16 GB RAM available before starting. Won't launch if memory is too low
+- **Memory watchdog** — background thread monitors RAM every 5 seconds. If available memory drops below 4 GB, kills the fold process before your system freezes
+- **Large protein detection** — proteins over 1000 residues automatically use fewer models (3 instead of 5) and reduced MSA depth to lower memory usage
+- **Stale process cleanup** — detects and kills orphaned ColabFold processes from previous crashes
+
+## Troubleshooting
+
+### `colabfold_batch: command not found`
+ColabFold isn't in your PATH. Either:
+- Activate the conda environment: `conda activate colabfold`
+- Set the full path in config: `colabfold_path = "/home/you/miniconda3/envs/colabfold/bin/colabfold_batch"`
+
+### `CUDA out of memory`
+Your GPU doesn't have enough VRAM for this protein. Try:
+- Reduce models: set `num_models = 3` in config
+- The tool automatically reduces settings for proteins >1000 residues, but some medium-sized proteins can also be memory-intensive
+
+### `No API key` in status
+Set your API key in the config file or as an environment variable:
+```bash
+export ANTHROPIC_API_KEY="sk-ant-your-key"
+```
+
+### `PubMed search failed`
+Usually a network issue. The tool will still complete — papers are optional. Use `--skip-papers` to skip entirely.
+
+### Fold takes too long
+ColabFold runtime depends on protein size:
+- Small proteins (<200 residues): 5-15 minutes
+- Medium (200-500): 15-45 minutes
+- Large (500-1000): 45-120 minutes
+- Very large (>1000): 2-4+ hours
+
+If a fold exceeds `timeout_hours`, it's killed automatically.
+
+### System freezes during fold
+Enable the memory watchdog (on by default): `memory_watchdog = true`. If freezes persist, reduce `num_models` to 3 and check your system has at least 16 GB RAM.
 
 ## License
 

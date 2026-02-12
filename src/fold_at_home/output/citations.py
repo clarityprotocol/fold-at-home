@@ -42,6 +42,10 @@ def format_works_cited_entry(
     pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
     links = f"[PubMed]({pubmed_url})"
 
+    doi = paper.get("doi")
+    if doi:
+        links += f" [DOI](https://doi.org/{doi})"
+
     entry = f"[{number}] {author_year}. {title} {journal} {links}"
 
     if relevance:

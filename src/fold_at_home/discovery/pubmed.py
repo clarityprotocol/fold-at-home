@@ -90,6 +90,13 @@ def search_papers(
 
         papers = []
         for record in records:
+            # Extract DOI from AID field (format: "10.xxxx/yyyy [doi]")
+            doi = None
+            for aid in record.get("AID", []):
+                if aid.endswith("[doi]"):
+                    doi = aid.replace(" [doi]", "").strip()
+                    break
+
             paper = {
                 "pmid": record.get("PMID", ""),
                 "title": record.get("TI", ""),
@@ -97,6 +104,7 @@ def search_papers(
                 "authors": record.get("AU", []),
                 "journal": record.get("JT", ""),
                 "pub_date": record.get("DP", ""),
+                "doi": doi,
                 "first_author": _parse_first_author(record.get("AU", [])),
                 "publication_year": _parse_year(record.get("DP", "")),
             }

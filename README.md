@@ -20,7 +20,9 @@ Predict protein structures and generate AI-powered research summaries — locall
 | **Windows (WSL2)** | Full support | Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) first, then follow Linux instructions inside WSL |
 | **macOS** | Analysis only | No NVIDIA GPU = no folding. You can use `--skip-fold` to analyze PDB files from elsewhere and generate summaries |
 
-ColabFold and AlphaFold require an **NVIDIA GPU with CUDA**. Apple Silicon (M1/M2/M3/M4) uses Metal, not CUDA, so folding cannot run on macOS. Everything else (analysis, papers, AI summary) works on any OS.
+ColabFold and AlphaFold require an **NVIDIA GPU with CUDA**. Apple Silicon (M1/M2/M3/M4) uses Metal, not CUDA, so folding cannot run natively on macOS. Everything else (analysis, papers, AI summary) works on any OS.
+
+**macOS workaround:** Use the free [ColabFold Google Colab notebook](https://colab.research.google.com/github/sokrypton/ColabFold/blob/main/AlphaFold2.ipynb) to fold on Google's GPUs, download the results, then run `fold-at-home fold PROTEIN VARIANT --skip-fold` locally for the full analysis and AI summary. See [macOS workflow](#macos-workflow-google-colab) below.
 
 **Minimum hardware for folding:**
 - NVIDIA GPU with 8+ GB VRAM (GTX 1080 or better)
@@ -263,7 +265,41 @@ fold-at-home fold SOD1 A4V --skip-papers
 fold-at-home fold SOD1 A4V --skip-fold --skip-papers
 ```
 
-> **macOS users:** You can fold on a Linux server or cloud GPU, copy the PDB files into `results/SOD1_A4V/structure/`, then run `fold-at-home fold SOD1 A4V --skip-fold` locally to get the full analysis and AI summary.
+> **macOS users:** See the [macOS workflow](#macos-workflow-google-colab) section below for step-by-step instructions using Google Colab.
+
+### macOS workflow (Google Colab)
+
+If you don't have an NVIDIA GPU (macOS, older laptops, etc.), you can fold proteins for free using Google Colab and then run the analysis locally:
+
+**1. Fold on Google Colab**
+
+Open the free ColabFold notebook: [ColabFold on Google Colab](https://colab.research.google.com/github/sokrypton/ColabFold/blob/main/AlphaFold2.ipynb)
+
+- Paste your protein sequence into the `query_sequence` field
+- Set `jobname` to something like `SOD1_A4V`
+- Click **Runtime → Run all**
+- When finished, Colab downloads a zip file with the PDB files and score JSONs
+
+**2. Copy results into fold-at-home's structure**
+
+```bash
+# Create the results directory
+mkdir -p results/SOD1_A4V/structure
+
+# Unzip and copy PDB + score files
+unzip SOD1_A4V.result.zip -d results/SOD1_A4V/structure/
+
+# You should now have .pdb and _scores_*.json files in structure/
+ls results/SOD1_A4V/structure/
+```
+
+**3. Run the analysis locally**
+
+```bash
+fold-at-home fold SOD1 A4V --skip-fold
+```
+
+This runs everything except the fold: pLDDT analysis, RMSD vs wild-type, ClinVar + gnomAD lookup, PubMed papers, and AI summary. You get the same `summary.md` and `metadata.json` as a full run.
 
 ## Output
 
